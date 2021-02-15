@@ -694,10 +694,6 @@ generateRequireModulesCode = (modules) ->
     jsCode += "modules['#{m}']=require('#{m}');";
   jsCode += '\n'
 
-updateIosRCTWebSocketExecutor = (iosHost) ->
-  RCTWebSocketExecutorPath = "node_modules/react-native/Libraries/WebSocket/RCTWebSocketExecutor.m"
-  edit RCTWebSocketExecutorPath, [[debugHostRx, "host] ?: @\"#{iosHost}\";"]]
-
 platformOfNamespace = (ns) ->
   if ns?
     possiblePlatforms = Object.keys platformMeta
@@ -773,9 +769,6 @@ generateDevScripts = () ->
       moduleMap = generateRequireModulesCode(platformModulesAndImages(config, platform))
       fs.writeFileSync "index.#{platform}.js", "#{moduleMap}require('./figwheel-bridge').withModules(modules).start('#{projName}','#{platform}','#{devHost[platform]}');"
       log "index.#{platform}.js was regenerated"
-
-    updateIosRCTWebSocketExecutor(devHost.ios)
-    log "Host in RCTWebSocketExecutor.m was updated"
 
     generateConfigNs(config);
     for platform in platforms

@@ -1,6 +1,6 @@
 {
   "name": "re-natal",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Bootstrap ClojureScript React Native apps with reagent, re-frame and om next for iOS and Android",
   "main": "index.js",
   "author": "Artur Girenko <a.girenko@gmail.com>",
@@ -21,9 +21,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/drapanjanas/re-natal.git"
+    "url": "git://github.com/mharju/re-natal.git"
   },
-  "homepage": "http://github.com/drapanjanas/re-natal.git",
+  "homepage": "http://github.com/mharju/re-natal.git",
   "engine-strict": true,
   "preferGlobal": true,
   "bin": {
@@ -41,7 +41,7 @@
     "om next"
   ],
   "bugs": {
-    "url": "https://github.com/drapanjanas/re-natal/issues"
+    "url": "https://github.com/mharju/re-natal/issues"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
