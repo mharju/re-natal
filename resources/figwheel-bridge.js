@@ -5,7 +5,6 @@
  */
 
 var debugEnabled = false;
-
 var config = {
     basePath: "target/",
     googBasePath: 'goog/',
@@ -15,7 +14,6 @@ var config = {
 var React = require('react');
 var createReactClass = require('create-react-class');
 var ReactNative = require('react-native');
-var WebSocket = require('WebSocket');
 var self;
 var evaluate = eval; // This is needed, direct calls to eval does not work (RN packager???)
 var externalModules = {};
@@ -113,13 +111,16 @@ function asyncImportScripts(url, transform, success, error) {
                 throw new Error("Failed to Fetch: " + url + " - Perhaps your project was cleaned and you haven't recompiled?")
             })
             .then(function (responseText) {
+                if (url === 'http://localhost:8081/target/ios/index.js')
+                  console.log("Eval", responseText)
+
                 evaluate(transform(responseText));
                 fireEvalListenters(url);
                 success();
                 return true;
             })
             .catch(function (e) {
-                console.error(e);
+                console.error("Failed to load", url, e);
                 error();
                 return true;
             });
@@ -144,6 +145,11 @@ function importJs(src, success, error) {
     var successCb = (typeof success == 'function') ? success : noop;
     var errorCb = (typeof error   == 'function') ? error : noop;
     logDebug('(importJs) Importing: ' + src);
+    if (src === 'deps.js') {
+      logDebug('(importJs) Skipping: ' + src)
+      successCb()
+      return
+    }
     if (isChrome()) {
         syncImportScripts(src, successCb, errorCb);
     } else {
@@ -152,17 +158,17 @@ function importJs(src, success, error) {
 }
 
 function interceptRequire() {
-    var oldRequire = window.__r;
+    var oldRequire = window.require;
     console.info("Shimming require");
-    function newRequire (id) {
-        console.info("Requiring: " + id);
+    window.require = function (id) {
         if (externalModules[id]) {
             return externalModules[id];
+        } else if (oldRequire) {
+          return oldRequire(id);
         }
-        return oldRequire(id);
-    }
-    window.require = newRequire;
-    window.__r = newRequire;
+        console.error("ERROR – " + id + " failed to load and no window.require defined.")
+        return null;
+    };
 }
 
 function serverBaseUrl(host) {
@@ -224,13 +230,8 @@ function loadApp(platform, devHost, onLoadCb) {
             shimBaseGoog(fileBasePath);
             importJs(fileBasePath + '/cljs_deps.js', function () {
                 importJs(fileBasePath + '/goog/deps.js', function () {
-                    // This is needed because of RN packager
-                    // seriously React packager? why.
-                    var googreq = goog.require;	
-                    googreq(`env.${platform}.main`);
-
-                    // Hot reloading Works for figwheel 0.5.14, but not 0.5.18 -- why?
-                    // importIndexJs(fileBasePath);                    
+                    console.log("Loading main app from", fileBasePath)
+                    importIndexJs(fileBasePath);
                 });
             });
         });
@@ -253,17 +254,42 @@ function figwheelImportScript(uri, callback) {
         function () {callback(false);})
 }
 
+
+function closureImportScript(src, optSourceText) {
+    if(!optSourceText) {
+      var flags = null;
+      if (goog.debugLoader_) {
+        var dep = goog.debugLoader_.dependencies_[src];
+        if (dep) {
+          flags = dep.loadFlags;
+        }
+      } else {
+        flags = goog.dependencies_.loadFlags[src];
+      }
+      importJs(src);
+    } else {
+      console.log("Need to eval", optSourceText)
+    }
+    return true;
+};
+global.CLOSURE_IMPORT_SCRIPT = closureImportScript;
+
 // Goog fixes
 function shimBaseGoog(basePath) {
     console.info('Shimming goog functions.');
     goog.basePath = basePath + '/' + config.googBasePath;
     goog.global.FIGWHEEL_WEBSOCKET_CLASS = WebSocket;
     goog.global.FIGWHEEL_IMPORT_SCRIPT = figwheelImportScript;
-    goog.writeScriptSrcNode = importJs;
-    goog.writeScriptTag_ = function (src, optSourceText) {
-        importJs(src);
-        return true;
-    };
+    goog.writeScriptSecNode = importJs;
+    goog.writeScriptTag_ = closureImportScript;
+    goog.global.CLOSURE_IMPORT_SCRIPT = closureImportScript;
+    // This function is actually expected to load the file synchronously for running
+    // transformations. Let's just return an empty object and asynchronously load files
+    // without transformation steps. For our use case, it seems to be working just fine.
+    goog.global.CLOSURE_LOAD_FILE_SYNC = function(url) {
+      asyncImportScripts(url, function(x){return x}, function(){}, function(){})
+      return '{}'
+    }
 }
 
 self = {
